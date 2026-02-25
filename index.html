@@ -269,6 +269,9 @@
         
         // 初始化
         document.addEventListener('DOMContentLoaded', () => {
+            // 加载摄像头列表
+            loadCameras();
+            
             // 加载历史记录
             loadHistory();
             
@@ -277,176 +280,43 @@
             stopScanBtn.addEventListener('click', stopScan);
             camerasSelect.addEventListener('change', stopAndRestartScan);
             clearHistoryBtn.addEventListener('click', clearHistory);
-            
-            // 添加页面可见性变化监听
-            document.addEventListener('visibilitychange', () => {
-                if (document.visibilityState === 'visible' && !isScanning) {
-                    // 页面重新可见时重新加载摄像头列表
-                    setTimeout(loadCameras, 1000);
-                }
-            });
-            
-            // 延迟加载摄像头列表，确保DOM完全就绪
-            setTimeout(loadCameras, 1000);
         });
         
         // 加载摄像头列表
         function loadCameras() {
             // 检查是否在安全上下文(HTTPS)中
             if (!window.isSecureContext) {
-                resultDiv.textContent = '提示: iOS Safari需要在HTTPS环境下才能访问摄像头';
-            }
-            
-            // 检测iOS设备
-            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-            
-            if (isIOS) {
-                resultDiv.textContent = 'iOS设备 detected. 点击"开始扫描"按钮获取摄像头权限';
-                // 在iOS上，直接启用扫描按钮，让用户点击时触发权限请求
-                startScanBtn.disabled = false;
-                return;
+                resultDiv.textContent = '提示: 为了访问摄像头，建议在HTTPS环境下使用此应用';
             }
             
             Html5Qrcode.getCameras()
                 .then(cameras => {
                     if (cameras && cameras.length > 0) {
-                        // 清空现有选项
-                        camerasSelect.innerHTML = '';
-                        
-                        // 添加摄像头选项
                         cameras.forEach(camera => {
                             const option = document.createElement('option');
                             option.value = camera.id;
                             option.text = camera.label || `摄像头 ${camerasSelect.length + 1}`;
                             camerasSelect.appendChild(option);
                         });
-                        
-                        // 启用扫描按钮
-                        startScanBtn.disabled = false;
-                        resultDiv.textContent = '请选择摄像头并开始扫描';
                     } else {
-                        resultDiv.textContent = '未检测到摄像头设备，请检查设备权限设置';
+                        resultDiv.textContent = '未检测到摄像头设备';
                         startScanBtn.disabled = true;
-                        
-                        // 尝试直接请求摄像头权限
-                        requestCameraPermission();
                     }
                 })
                 .catch(err => {
                     console.error('无法加载摄像头:', err);
-                    
-                    // 根据错误类型显示不同的提示
-                    if (err.name === 'NotAllowedError' || err.message.includes('permission')) {
-                        resultDiv.textContent = '摄像头权限被拒绝，请在浏览器设置中允许摄像头访问';
-                    } else if (err.name === 'NotFoundError') {
-                        resultDiv.textContent = '未检测到摄像头设备';
-                    } else {
-                        resultDiv.textContent = '无法访问摄像头: ' + err.message;
-                    }
-                    
+                    resultDiv.textContent = '无法访问摄像头: ' + err.message;
                     startScanBtn.disabled = true;
-                    
-                    // 尝试直接请求摄像头权限
-                    requestCameraPermission();
                 });
-        }
-        
-        // 直接请求摄像头权限
-        function requestCameraPermission() {
-            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-                navigator.mediaDevices.getUserMedia({ video: true })
-                    .then(stream => {
-                        // 权限获取成功，重新加载摄像头列表
-                        stream.getTracks().forEach(track => track.stop());
-                        setTimeout(loadCameras, 500);
-                    })
-                    .catch(err => {
-                        console.error('请求摄像头权限失败:', err);
-                    });
-            }
-        }
-        
-        // 检测iOS设备
-        function isIOSDevice() {
-            return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
         }
         
         // 开始扫描
         function startScan() {
-            // 检测iOS设备
-            const isIOS = isIOSDevice();
-            
-            if (isIOS) {
-                // iOS设备特殊处理
-                resultDiv.textContent = '正在请求摄像头权限...';
-                
-                // 直接请求摄像头权限
-                if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-                    navigator.mediaDevices.getUserMedia({ video: true })
-                        .then(stream => {
-                            // 权限获取成功，停止临时流
-                            stream.getTracks().forEach(track => track.stop());
-                            
-                            // 使用默认配置启动扫描
-                            const config = {
-                                fps: 10,
-                                qrbox: { width: 250, height: 250 },
-                                rememberLastUsedCamera: true,
-                                aspectRatio: 1, // iOS上使用1:1比例
-                                disableFlip: false
-                            };
-                            
-                            // 创建扫描器实例
-                            html5QrcodeScanner = new Html5Qrcode('scanner-container');
-                            
-                            // 使用environment模式启动扫描（后置摄像头）
-                            html5QrcodeScanner.start(
-                                { facingMode: 'environment' },
-                                config,
-                                onScanSuccess,
-                                onScanError
-                            )
-                            .then(() => {
-                                isScanning = true;
-                                startScanBtn.disabled = true;
-                                stopScanBtn.disabled = false;
-                                resultDiv.textContent = '正在扫描条码...';
-                                
-                                // 添加扫描线效果
-                                addScanOverlay();
-                            })
-                            .catch(err => {
-                                console.error('启动扫描失败:', err);
-                                resultDiv.textContent = '启动扫描失败: ' + err.message;
-                            });
-                        })
-                        .catch(err => {
-                            console.error('请求摄像头权限失败:', err);
-                            if (err.name === 'NotAllowedError') {
-                                resultDiv.textContent = '摄像头权限被拒绝，请在iOS设置中允许浏览器访问摄像头';
-                            } else {
-                                resultDiv.textContent = '无法访问摄像头: ' + err.message;
-                            }
-                        });
-                } else {
-                    resultDiv.textContent = '浏览器不支持摄像头访问';
-                }
-                return;
-            }
-            
-            // 非iOS设备的处理
             const selectedCamera = camerasSelect.value;
             
             if (!selectedCamera) {
-                // 尝试自动选择默认摄像头
-                if (camerasSelect.options.length > 0) {
-                    camerasSelect.selectedIndex = 0;
-                    startScan();
-                    return;
-                } else {
-                    resultDiv.textContent = '请先选择一个摄像头设备';
-                    return;
-                }
+                resultDiv.textContent = '请先选择一个摄像头设备';
+                return;
             }
             
             // 配置html5-qrcode扫描器
@@ -454,7 +324,7 @@
                 fps: 10,
                 qrbox: { width: 250, height: 250 },
                 rememberLastUsedCamera: true,
-                aspectRatio: window.innerWidth < 768 ? 1 : 4/3, // 手机上使用1:1比例
+                aspectRatio: window.innerWidth < 768 ? 1 : 4/3,
                 disableFlip: false
             };
             
@@ -479,20 +349,7 @@
             })
             .catch(err => {
                 console.error('启动扫描失败:', err);
-                
-                // 根据错误类型显示不同的提示
-                if (err.name === 'NotAllowedError' || err.message.includes('permission')) {
-                    resultDiv.textContent = '摄像头权限被拒绝，请在浏览器设置中允许摄像头访问';
-                } else if (err.name === 'NotFoundError') {
-                    resultDiv.textContent = '未找到指定的摄像头设备';
-                } else if (err.message.includes('constraint')) {
-                    resultDiv.textContent = '摄像头参数错误，请尝试选择其他摄像头';
-                } else {
-                    resultDiv.textContent = '启动扫描失败: ' + err.message;
-                }
-                
-                // 尝试重新加载摄像头列表
-                setTimeout(loadCameras, 1000);
+                resultDiv.textContent = '启动扫描失败: ' + err.message;
             });
         }
         
