@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>条码扫描应用</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #333;
+            font-size: 24px;
+        }
+        
+        .scanner-section {
+            background-color: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h2 {
+            margin-bottom: 15px;
+            color: #333;
+            font-size: 18px;
+        }
+        
+        #scanner-container {
+            position: relative;
+            width: 100%;
+            max-width: 640px;
+            margin: 0 auto 20px;
+            aspect-ratio: 4/3;
+            background-color: #000;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        #html5-qrcode-anchor {
+            width: 100% !important;
+            height: 100% !important;
+        }
+        
+        #html5-qrcode-anchor video {
+            width: 100% !important;
+            height: 100% !important;
+            object-fit: cover;
+        }
+        
+        .scan-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            background: linear-gradient(
+                to bottom,
+                rgba(0,0,0,0.5) 0%,
+                rgba(0,0,0,0) 30%,
+                rgba(0,0,0,0) 70%,
+                rgba(0,0,0,0.5) 100%
+            );
+            border-radius: 10px;
+        }
+        
+        .scan-line {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background-color: #ff0000;
+            animation: scan 2s linear infinite;
+        }
+        
+        @keyframes scan {
+            0% { top: 0; }
+            100% { top: 100%; }
+        }
+        
+        .controls {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        button {
+            padding: 12px 24px;
+            margin: 0 10px;
+            border: none;
+            border-radius: 5px;
+            background-color: #4CAF50;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        button:hover {
+            background-color: #45a049;
+        }
+        
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        
+        #cameras {
+            padding: 10px;
+            margin: 0 10px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+            font-size: 16px;
+        }
+        
+        .result-section {
+            background-color: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        #result {
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            min-height: 60px;
+            font-family: monospace;
+            font-size: 16px;
+            word-break: break-all;
+        }
+        
+        .history-section {
+            background-color: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        #history {
+            list-style: none;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        #history li {
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+        
+        #history li:last-child {
+            border-bottom: none;
+        }
+        
+        .timestamp {
+            font-size: 12px;
+            color: #999;
+            margin-left: 10px;
+            white-space: nowrap;
+        }
+        
+        .code-content {
+            flex: 1;
+            word-break: break-all;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            h1 {
+                font-size: 20px;
+            }
+            
+            h2 {
+                font-size: 16px;
+            }
+            
+            button {
+                display: block;
+                margin: 10px auto;
+                width: 80%;
+            }
+            
+            #cameras {
+                display: block;
+                margin: 10px auto;
+                width: 80%;
+            }
+            
+            #scanner-container {
+                aspect-ratio: 1/1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>条码扫描应用</h1>
+        
+        <!-- 摄像头扫描区域 -->
+        <div class="scanner-section">
+            <h2>摄像头扫描</h2>
+            <div id="scanner-container">
+                <!-- 扫描器将在这里渲染 -->
+            </div>
+            <div class="controls">
+                <select id="cameras"></select>
+                <button id="start-scan">开始扫描</button>
+                <button id="stop-scan" disabled>停止扫描</button>
+            </div>
+        </div>
+        
+        <!-- 扫描结果区域 -->
+        <div class="result-section">
+            <h2>扫描结果</h2>
+            <div id="result">请开始扫描条码...</div>
+        </div>
+        
+        <!-- 历史记录区域 -->
+        <div class="history-section">
+            <h2>扫描历史</h2>
+            <ul id="history"></ul>
+            <button id="clear-history">清空历史</button>
+        </div>
+    </div>
+    
+    <!-- 引入html5-qrcode库 -->
+    <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <script>
+        // 全局变量
+        let html5QrcodeScanner = null;
+        let isScanning = false;
+        
+        // DOM元素
+        const scannerContainer = document.getElementById('scanner-container');
+        const camerasSelect = document.getElementById('cameras');
+        const startScanBtn = document.getElementById('start-scan');
+        const stopScanBtn = document.getElementById('stop-scan');
+        const resultDiv = document.getElementById('result');
+        const historyList = document.getElementById('history');
+        const clearHistoryBtn = document.getElementById('clear-history');
+        
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            // 加载历史记录
+            loadHistory();
+            
+            // 事件监听
+            startScanBtn.addEventListener('click', startScan);
+            stopScanBtn.addEventListener('click', stopScan);
+            camerasSelect.addEventListener('change', stopAndRestartScan);
+            clearHistoryBtn.addEventListener('click', clearHistory);
+            
+            // 添加页面可见性变化监听
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'visible' && !isScanning) {
+                    // 页面重新可见时重新加载摄像头列表
+                    setTimeout(loadCameras, 1000);
+                }
+            });
+            
+            // 延迟加载摄像头列表，确保DOM完全就绪
+            setTimeout(loadCameras, 1000);
+        });
+        
+        // 加载摄像头列表
+        function loadCameras() {
+            // 检查是否在安全上下文(HTTPS)中
+            if (!window.isSecureContext) {
+                resultDiv.textContent = '提示: iOS Safari需要在HTTPS环境下才能访问摄像头';
+            }
+            
+            // 检测iOS设备
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+            
+            if (isIOS) {
+                resultDiv.textContent = 'iOS设备 detected. 点击"开始扫描"按钮获取摄像头权限';
+                // 在iOS上，直接启用扫描按钮，让用户点击时触发权限请求
+                startScanBtn.disabled = false;
+                return;
+            }
+            
+            Html5Qrcode.getCameras()
+                .then(cameras => {
+                    if (cameras && cameras.length > 0) {
+                        // 清空现有选项
+                        camerasSelect.innerHTML = '';
+                        
+                        // 添加摄像头选项
+                        cameras.forEach(camera => {
+                            const option = document.createElement('option');
+                            option.value = camera.id;
+                            option.text = camera.label || `摄像头 ${camerasSelect.length + 1}`;
+                            camerasSelect.appendChild(option);
+                        });
+                        
+                        // 启用扫描按钮
+                        startScanBtn.disabled = false;
+                        resultDiv.textContent = '请选择摄像头并开始扫描';
+                    } else {
+                        resultDiv.textContent = '未检测到摄像头设备，请检查设备权限设置';
+                        startScanBtn.disabled = true;
+                        
+                        // 尝试直接请求摄像头权限
+                        requestCameraPermission();
+                    }
+                })
+                .catch(err => {
+                    console.error('无法加载摄像头:', err);
+                    
+                    // 根据错误类型显示不同的提示
+                    if (err.name === 'NotAllowedError' || err.message.includes('permission')) {
+                        resultDiv.textContent = '摄像头权限被拒绝，请在浏览器设置中允许摄像头访问';
+                    } else if (err.name === 'NotFoundError') {
+                        resultDiv.textContent = '未检测到摄像头设备';
+                    } else {
+                        resultDiv.textContent = '无法访问摄像头: ' + err.message;
+                    }
+                    
+                    startScanBtn.disabled = true;
+                    
+                    // 尝试直接请求摄像头权限
+                    requestCameraPermission();
+                });
+        }
+        
+        // 直接请求摄像头权限
+        function requestCameraPermission() {
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                navigator.mediaDevices.getUserMedia({ video: true })
+                    .then(stream => {
+                        // 权限获取成功，重新加载摄像头列表
+                        stream.getTracks().forEach(track => track.stop());
+                        setTimeout(loadCameras, 500);
+                    })
+                    .catch(err => {
+                        console.error('请求摄像头权限失败:', err);
+                    });
+            }
+        }
+        
+        // 检测iOS设备
+        function isIOSDevice() {
+            return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        }
+        
+        // 开始扫描
+        function startScan() {
+            // 检测iOS设备
+            const isIOS = isIOSDevice();
+            
+            if (isIOS) {
+                // iOS设备特殊处理
+                resultDiv.textContent = '正在请求摄像头权限...';
+                
+                // 直接请求摄像头权限
+                if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                    navigator.mediaDevices.getUserMedia({ video: true })
+                        .then(stream => {
+                            // 权限获取成功，停止临时流
+                            stream.getTracks().forEach(track => track.stop());
+                            
+                            // 使用默认配置启动扫描
+                            const config = {
+                                fps: 10,
+                                qrbox: { width: 250, height: 250 },
+                                rememberLastUsedCamera: true,
+                                aspectRatio: 1, // iOS上使用1:1比例
+                                disableFlip: false
+                            };
+                            
+                            // 创建扫描器实例
+                            html5QrcodeScanner = new Html5Qrcode('scanner-container');
+                            
+                            // 使用environment模式启动扫描（后置摄像头）
+                            html5QrcodeScanner.start(
+                                { facingMode: 'environment' },
+                                config,
+                                onScanSuccess,
+                                onScanError
+                            )
+                            .then(() => {
+                                isScanning = true;
+                                startScanBtn.disabled = true;
+                                stopScanBtn.disabled = false;
+                                resultDiv.textContent = '正在扫描条码...';
+                                
+                                // 添加扫描线效果
+                                addScanOverlay();
+                            })
+                            .catch(err => {
+                                console.error('启动扫描失败:', err);
+                                resultDiv.textContent = '启动扫描失败: ' + err.message;
+                            });
+                        })
+                        .catch(err => {
+                            console.error('请求摄像头权限失败:', err);
+                            if (err.name === 'NotAllowedError') {
+                                resultDiv.textContent = '摄像头权限被拒绝，请在iOS设置中允许浏览器访问摄像头';
+                            } else {
+                                resultDiv.textContent = '无法访问摄像头: ' + err.message;
+                            }
+                        });
+                } else {
+                    resultDiv.textContent = '浏览器不支持摄像头访问';
+                }
+                return;
+            }
+            
+            // 非iOS设备的处理
+            const selectedCamera = camerasSelect.value;
+            
+            if (!selectedCamera) {
+                // 尝试自动选择默认摄像头
+                if (camerasSelect.options.length > 0) {
+                    camerasSelect.selectedIndex = 0;
+                    startScan();
+                    return;
+                } else {
+                    resultDiv.textContent = '请先选择一个摄像头设备';
+                    return;
+                }
+            }
+            
+            // 配置html5-qrcode扫描器
+            const config = {
+                fps: 10,
+                qrbox: { width: 250, height: 250 },
+                rememberLastUsedCamera: true,
+                aspectRatio: window.innerWidth < 768 ? 1 : 4/3, // 手机上使用1:1比例
+                disableFlip: false
+            };
+            
+            // 创建扫描器实例
+            html5QrcodeScanner = new Html5Qrcode('scanner-container');
+            
+            // 开始扫描
+            html5QrcodeScanner.start(
+                selectedCamera,
+                config,
+                onScanSuccess,
+                onScanError
+            )
+            .then(() => {
+                isScanning = true;
+                startScanBtn.disabled = true;
+                stopScanBtn.disabled = false;
+                resultDiv.textContent = '正在扫描条码...';
+                
+                // 添加扫描线效果
+                addScanOverlay();
+            })
+            .catch(err => {
+                console.error('启动扫描失败:', err);
+                
+                // 根据错误类型显示不同的提示
+                if (err.name === 'NotAllowedError' || err.message.includes('permission')) {
+                    resultDiv.textContent = '摄像头权限被拒绝，请在浏览器设置中允许摄像头访问';
+                } else if (err.name === 'NotFoundError') {
+                    resultDiv.textContent = '未找到指定的摄像头设备';
+                } else if (err.message.includes('constraint')) {
+                    resultDiv.textContent = '摄像头参数错误，请尝试选择其他摄像头';
+                } else {
+                    resultDiv.textContent = '启动扫描失败: ' + err.message;
+                }
+                
+                // 尝试重新加载摄像头列表
+                setTimeout(loadCameras, 1000);
+            });
+        }
+        
+        // 停止扫描
+        function stopScan() {
+            if (html5QrcodeScanner) {
+                html5QrcodeScanner.stop()
+                    .then(() => {
+                        isScanning = false;
+                        startScanBtn.disabled = false;
+                        stopScanBtn.disabled = true;
+                        resultDiv.textContent = '扫描已停止';
+                        
+                        // 移除扫描线效果
+                        removeScanOverlay();
+                    })
+                    .catch(err => {
+                        console.error('停止扫描失败:', err);
+                        resultDiv.textContent = '停止扫描失败: ' + err.message;
+                    });
+            }
+        }
+        
+        // 停止并重启扫描（切换摄像头时）
+        function stopAndRestartScan() {
+            if (isScanning) {
+                stopScan();
+                // 延迟启动，确保扫描器完全停止
+                setTimeout(startScan, 500);
+            }
+        }
+        
+        // 扫描成功回调
+        function onScanSuccess(decodedText, decodedResult) {
+            resultDiv.textContent = `扫描成功: ${decodedText}`;
+            
+            // 添加到历史记录
+            addToHistory(decodedText);
+            
+            // 短暂显示结果后继续扫描
+            setTimeout(() => {
+                resultDiv.textContent = '正在扫描条码...';
+            }, 2000);
+        }
+        
+        // 扫描错误回调
+        function onScanError(errorMessage) {
+            // 忽略常见的扫描错误，只处理严重错误
+            if (errorMessage.includes('NotFoundError') || errorMessage.includes('TimeoutError')) {
+                return;
+            }
+            console.error('扫描错误:', errorMessage);
+        }
+        
+        // 添加扫描线效果
+        function addScanOverlay() {
+            // 先移除已有的覆盖层
+            removeScanOverlay();
+            
+            // 创建新的覆盖层
+            const overlay = document.createElement('div');
+            overlay.className = 'scan-overlay';
+            
+            const scanLine = document.createElement('div');
+            scanLine.className = 'scan-line';
+            
+            overlay.appendChild(scanLine);
+            scannerContainer.appendChild(overlay);
+        }
+        
+        // 移除扫描线效果
+        function removeScanOverlay() {
+            const existingOverlay = scannerContainer.querySelector('.scan-overlay');
+            if (existingOverlay) {
+                existingOverlay.remove();
+            }
+        }
+        
+        // 添加到历史记录
+        function addToHistory(code) {
+            const timestamp = new Date().toLocaleString();
+            const historyItem = {
+                code: code,
+                timestamp: timestamp
+            };
+            
+            // 获取现有历史记录
+            let history = JSON.parse(localStorage.getItem('barcodeHistory') || '[]');
+            
+            // 添加新记录到开头
+            history.unshift(historyItem);
+            
+            // 限制历史记录数量
+            if (history.length > 50) {
+                history = history.slice(0, 50);
+            }
+            
+            // 保存到本地存储
+            localStorage.setItem('barcodeHistory', JSON.stringify(history));
+            
+            // 更新历史记录UI
+            renderHistory(history);
+        }
+        
+        // 加载历史记录
+        function loadHistory() {
+            const history = JSON.parse(localStorage.getItem('barcodeHistory') || '[]');
+            renderHistory(history);
+        }
+        
+        // 渲染历史记录
+        function renderHistory(history) {
+            historyList.innerHTML = '';
+            
+            history.forEach(item => {
+                const li = document.createElement('li');
+                li.innerHTML = `
+                    <span class="code-content">${item.code}</span>
+                    <span class="timestamp">${item.timestamp}</span>
+                `;
+                historyList.appendChild(li);
+            });
+        }
+        
+        // 清空历史记录
+        function clearHistory() {
+            localStorage.removeItem('barcodeHistory');
+            historyList.innerHTML = '';
+            resultDiv.textContent = '历史记录已清空';
+        }
+    </script>
+</body>
+</html>
