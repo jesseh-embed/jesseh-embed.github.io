@@ -327,9 +327,17 @@
                 aspectRatio: window.innerWidth < 768 ? 1 : 4/3,
                 disableFlip: false
             };
+
+            const customFormats = [
+                Html5QrcodeSupportedFormats.QR_CODE,
+                Html5QrcodeSupportedFormats.CODE_128
+            ];
             
             // 创建扫描器实例
-            html5QrcodeScanner = new Html5Qrcode('scanner-container');
+            html5QrcodeScanner = new Html5Qrcode(
+                'scanner-container',
+                { formatsToSupport: customFormats }
+            );
             
             // 开始扫描
             html5QrcodeScanner.start(
